@@ -7,6 +7,11 @@ function f = cubic_spline(x, y)
 %   Outputs: 
 %     f: an inline function that computes the fitted piecewise cubic polynomial
 
+    % Check to make sure data is equally space
+    if length(unique(diff(x))) > 1
+        error('Values of indendepdent variables must be equally spaced.');
+    end
+
     %create matrix
     N = length(x);
     delta = abs(x(1)-x(2));
@@ -29,7 +34,7 @@ function f = cubic_spline(x, y)
     G = A\(B');
     
     % Create function
-    j = @(yy) interp1(x, 1:1:N, yy, 'previous'); 
+    j = @(yy) interp1(x, 1:1:N, min(yy, N-1), 'previous'); 
     f = @(xx) (G(j(xx))/6)*(((x(j(xx)+1)-xx)^3)/delta-delta*(x(j(xx)+1)-xx)) ...
         + (G(j(xx)+1)/6)*(((xx-x(j(xx)))^3)/delta-delta*(xx-x(j(xx)))) ...
         + y(j(xx))*(x(j(xx)+1)-xx)/delta + y(j(xx)+1)*(xx-x(j(xx)))/delta;
