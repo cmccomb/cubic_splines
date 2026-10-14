@@ -1,2 +1,12 @@
-# cubic_splines [![Build Status](https://travis-ci.org/cmccomb/cubic_splines.svg?branch=master)](https://travis-ci.org/cmccomb/cubic_splines)
-Fits a cubic spline to a set of data, and returns an inline function for the fit.
+# cubic_splines (archived)
+
+This is a historical cubic-spline implementation retained for reference.
+It is not maintained or recommended as a general interpolation tool. The
+function assumes equally spaced sample points and has limited input and
+query-range handling.
+
+For current MATLAB work, use the supported
+[spline](https://www.mathworks.com/help/matlab/ref/spline.html) and
+[ppval](https://www.mathworks.com/help/matlab/ref/ppval.html) functions.
+
+The original source is licensed under BSD 3-Clause; see [LICENSE](LICENSE).
