@@ -1,41 +1,72 @@
 function f = cubic_spline(x, y)
-% CUBIC_SPLINE Cubic splines fit to a data set
-% For CUBIC_SPLINE(X, Y)
-%   Inputs:
-%     X: a vector of values for the independent variable
-%     Y: a vector of values for the dependent variable
-%   Outputs: 
-%     f: an inline function that computes the fitted piecewise cubic polynomial
+%CUBIC_SPLINE Return a function handle for natural cubic interpolation.
+%   F = CUBIC_SPLINE(X,Y) interpolates the data at strictly increasing,
+%   finite knots X and returns a function handle F. F accepts scalar or
+%   array-valued queries inside [X(1), X(end)] and preserves their shape.
+%   The second derivative is zero at both endpoints. Querying outside the
+%   knot range raises an error rather than extrapolating silently.
 
-    % Check to make sure data is equally space
-    if length(unique(diff(x))) > 1
-        error('Values of indendepdent variables must be equally spaced.');
+    validateattributes(x, {'numeric'}, ...
+        {'vector', 'real', 'finite', 'nonempty'}, mfilename, 'x', 1);
+    validateattributes(y, {'numeric'}, ...
+        {'vector', 'real', 'finite', 'nonempty'}, mfilename, 'y', 2);
+
+    if numel(x) ~= numel(y) || numel(x) < 2
+        error('cubic_spline:InputSize', ...
+            'x and y must have the same number of elements (at least two).');
     end
 
-    %create matrix
-    N = length(x);
-    delta = abs(x(1)-x(2));
-    for i=1:1:N
-        if i==1
-            A(1,1) = 1;
-            B(1) = 0;
-        elseif i==N
-            A(N, N) = 1;
-            B(N) = 0;
-        else
-            A(i,i-1) = 1/6;
-            A(i,i) = 2/3;
-            A(i,i+1) = 1/6;
-            B(i) = (y(i+1)-2*y(i)+y(i-1))/(delta^2);
+    x = double(x(:).');
+    y = double(y(:).');
+    h = diff(x);
+    if any(h <= 0)
+        error('cubic_spline:KnotsNotIncreasing', ...
+            'x must contain distinct, strictly increasing knots.');
+    end
+
+    n = numel(x);
+    second = zeros(1, n);
+    if n > 2
+        interiorCount = n - 2;
+        diagonal = 2 * (h(1:end-1) + h(2:end));
+        system = sparse(1:interiorCount, 1:interiorCount, ...
+            diagonal, interiorCount, interiorCount);
+        if n > 3
+            offDiagonal = h(2:end-1);
+            upper = sparse(1:interiorCount-1, 2:interiorCount, ...
+                offDiagonal, interiorCount, interiorCount);
+            system = system + upper + upper.';
         end
+        slopes = diff(y) ./ h;
+        rhs = 6 * diff(slopes);
+        second(2:end-1) = (system \ rhs(:)).';
     end
-            
-    %solve matrix
-    G = A\(B');
-    
-    % Create function
-    j = @(yy) min(floor((yy - min(x))/(x(2) - x(1))) + 1, length(x)-1);
-    f = @(xx) (G(j(xx))/6)*(((x(j(xx)+1)-xx)^3)/delta-delta*(x(j(xx)+1)-xx)) ...
-        + (G(j(xx)+1)/6)*(((xx-x(j(xx)))^3)/delta-delta*(xx-x(j(xx)))) ...
-        + y(j(xx))*(x(j(xx)+1)-xx)/delta + y(j(xx)+1)*(xx-x(j(xx)))/delta;
+
+    f = @(query) evaluateSpline(query, x, y, h, second);
+end
+
+function values = evaluateSpline(query, x, y, h, second)
+    validateattributes(query, {'numeric'}, {'real', 'finite'}, ...
+        'cubic_spline function handle', 'query');
+    if any(query(:) < x(1) | query(:) > x(end))
+        error('cubic_spline:QueryOutOfRange', ...
+            'Query points must lie within the knot range.');
+    end
+    if isempty(query)
+        values = zeros(size(query));
+        return
+    end
+
+    shape = size(query);
+    q = double(query(:));
+    interval = min(numel(x) - 1, interp1(x, 1:numel(x), q, 'previous'));
+    width = reshape(h(interval), [], 1);
+    left = (reshape(x(interval + 1), [], 1) - q) ./ width;
+    right = (q - reshape(x(interval), [], 1)) ./ width;
+    v = left .* reshape(y(interval), [], 1) ...
+        + right .* reshape(y(interval + 1), [], 1) ...
+        + ((left.^3 - left) .* reshape(second(interval), [], 1) ...
+        + (right.^3 - right) .* reshape(second(interval + 1), [], 1)) ...
+        .* (width.^2 / 6);
+    values = reshape(v, shape);
 end
